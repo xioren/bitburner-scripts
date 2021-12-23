@@ -1,0 +1,13 @@
+disableLog("ALL")
+var currentHost = getHostname();
+var threads = args[0];
+
+
+while(true) {
+	if (getServerSecurityLevel(currentHost) > getServerMinSecurityLevel(currentHost)) {
+		weaken(currentHost, { threads: threads });
+	}
+	if (getServerMoneyAvailable(currentHost) < getServerMaxMoney(currentHost)) {
+		grow(currentHost, { threads: threads });
+	}
+}
