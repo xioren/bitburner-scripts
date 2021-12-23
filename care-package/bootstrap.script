@@ -15,7 +15,7 @@ function combinedUsage() {
 
 print("bootstrapping ", currentHost);
 
-
+// maximize thread count for both scripts
 if (combinedUsage() < availableRam) {
 	while (combinedUsage() < availableRam) {
 		fitnessThreads += 1;
@@ -34,8 +34,8 @@ if (combinedUsage() < availableRam) {
 		exec("/care_package/fitness.script", currentHost, numThreads=fitnessThreads, fitnessThreads);
 		spawn("/care_package/mine.script", numThreads=miningThreads, miningThreads);
 	} else {
-		print("not enough ram to enable fitness while bootstrapping");
+		print("not enough ram to run fitness.script while bootstrapping");
 	}
 } else {
-	print("not enough ram to bootstrap (non-branching)");
+	print("not enough ram to bootstrap");
 }
