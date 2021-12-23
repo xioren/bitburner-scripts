@@ -1,0 +1,117 @@
+var visibleServers = [];
+var completedServers = ["home"];
+var currentServer = "";
+var ownedServers = ["home"].concat(getPurchasedServers());
+var whitelist = ["CSEC", "darkweb", "home"];
+var files = ls("home", "/care_package/");
+var requiredRam = getScriptRam("/care_package/bootstrap.script");
+var serverSuccess = false;
+
+
+function Queue() {
+    this.elements = ["home"];
+}
+
+Queue.prototype.enqueue = function (e) {
+    if (completedServers.indexOf(e) == -1 && this.elements.indexOf(e) == -1) {
+        this.elements.push(e);
+    }
+};
+
+Queue.prototype.dequeue = function () {
+    return this.elements.shift();
+};
+
+Queue.prototype.isEmpty = function () {
+    return this.elements.length == 0;
+};
+
+Queue.prototype.length = function() {
+    return this.elements.length;
+}
+
+var queuedServers = new Queue();
+
+
+function compromiseServer(hostname) {
+	var portsRequired = getServerNumPortsRequired(hostname);
+	var portsOpened = 0;
+	if (portsRequired > 0) {
+		if (portsRequired >= 5 && fileExists("SQLInject.exe", "home")) {
+			sqlinject(hostname);
+			portsOpened += 1;
+		} if (portsRequired >= 4 && fileExists("HTTPWorm.exe", "home")) {
+			httpworm(hostname);
+			portsOpened += 1;
+		} if (portsRequired >= 3 && fileExists("relaySMTP.exe", "home")) {
+			relaysmtp(hostname);
+			portsOpened += 1;
+		} if (portsRequired >= 2 && fileExists("FTPCrack.exe", "home")) {
+			ftpcrack(hostname);
+			portsOpened += 1;
+		} if (portsRequired >= 1 && fileExists("BruteSSH.exe", "home")) {
+			brutessh(hostname);
+			portsOpened += 1;
+		}
+
+		if (portsOpened >= portsRequired) {
+			nuke(hostname);
+			return true;
+		} else {
+			return false;
+		}
+	} else {
+		nuke(hostname);
+		return true;
+	}
+}
+
+
+function setupServer(hostname) {
+	// move files to and start bootstrapping remote host
+	var availableRam = getServerMaxRam(hostname) - getServerUsedRam(hostname);
+	
+	if (requiredRam < availableRam && whitelist.indexOf(hostname) == -1) {
+		scp(files, "home", hostname);	
+		killall(hostname);
+		if (exec("/care_package/bootstrap.script", hostname, 1) == 0) {
+			return false;
+		} else {
+			return true;
+		}
+	} else {
+		return true;
+	}
+}
+
+
+main:
+while (true) {
+    currentServer = queuedServers.dequeue();
+    visibleServers = scan(currentServer);
+    
+	for (var i = 0; i < visibleServers.length; i++) {
+        queuedServers.enqueue(visibleServers[i]);
+    }
+
+	if (hasRootAccess(currentServer) == false) {
+		serverSuccess = compromiseServer(currentServer) == false &&
+						completedServers.indexOf(currentServer) == -1 &&
+						setupServer(currentServer);
+	} else {
+		serverSuccess = ownedServers.indexOf(currentServer) == -1 &&
+						completedServers.indexOf(currentServer) == -1 &&
+						setupServer(currentServer);
+	}
+	
+	if (serverSuccess) {
+		completedServers.push(currentServer);
+	} else {
+		queuedServers.enqueue(currentServer);
+		continue;
+	}
+    
+	if (queuedServers.isEmpty()) {
+        break;
+    }
+}
