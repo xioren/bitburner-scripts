@@ -1,0 +1,41 @@
+disableLog("ALL");
+var currentHost = getHostname();
+var branching = args[0];
+var fitnessThreads = 1;
+var miningThreads = 1;
+var fitnessBaseUsage = getScriptRam("/care_package/fitness.script");
+var miningBaseUsage = getScriptRam("/care_package/mine.script");
+var availableRam = getServerMaxRam(currentHost) - getServerUsedRam(currentHost) + getScriptRam("/care_package/bootstrap.script");
+
+
+function combinedUsage() {
+	return (fitnessBaseUsage * fitnessThreads) + (miningBaseUsage * miningThreads);
+}
+
+
+print("bootstrapping ", currentHost);
+
+
+if (combinedUsage() < availableRam) {
+	while (combinedUsage() < availableRam) {
+		fitnessThreads += 1;
+		if (combinedUsage() < availableRam) {
+			miningThreads += 1;
+			if (combinedUsage() > availableRam) {
+				miningThreads -= 1;
+				break;
+			}
+		} else {
+			fitnessThreads -= 1;
+			break;
+		}
+	}
+	if (fitnessBaseUsage * fitnessThreads <= getServerMaxRam(currentHost) - getServerUsedRam(currentHost)) {
+		exec("/care_package/fitness.script", currentHost, numThreads=fitnessThreads, fitnessThreads);
+		spawn("/care_package/mine.script", numThreads=miningThreads, miningThreads);
+	} else {
+		print("not enough ram to enable fitness while bootstrapping");
+	}
+} else {
+	print("not enough ram to bootstrap (non-branching)");
+}
