@@ -1,0 +1,13 @@
+disableLog("ALL");
+
+var currentHost = getHostname();
+var threads = args[0];
+var minHackLevel = getServerRequiredHackingLevel(currentHost);
+
+while (getHackingLevel() < minHackLevel) {
+  sleep(60000);
+}
+
+while (true) {
+  hack(currentHost, { threads: threads });
+}
