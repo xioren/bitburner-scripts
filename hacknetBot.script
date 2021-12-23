@@ -1,0 +1,101 @@
+// disableLog("ALL");
+
+
+var infinityCount = 0;
+var nodeLimit = 5;
+var levelCost = 0;
+var ramCost = 0;
+var coreCost = 0;
+var maxedNodes = 0;
+var ownedNodes = 0;
+
+
+function moneyAvailable() {
+	return getServerMoneyAvailable("home");
+}
+
+
+function bumpLevel(i, n) {
+	levelCost = hacknet.getLevelUpgradeCost(i, n);
+	while (moneyAvailable() < levelCost) {
+		sleep(30000);
+	}
+	hacknet.upgradeLevel(i, n);
+}
+
+
+function bumpRam(i, n) {
+	ramCost = hacknet.getRamUpgradeCost(i, n);
+	while (moneyAvailable() < ramCost) {
+		sleep(30000);
+	}
+	hacknet.upgradeRam(i, n);
+}
+
+
+function bumpCore(i, n) {
+	coreCost = hacknet.getCoreUpgradeCost(i);
+	while (moneyAvailable() < coreCost) {
+		sleep(30000);
+	}
+	hacknet.upgradeCore(i, n);
+}
+
+
+while (true) {
+	ownedNodes = hacknet.numNodes();
+	// purchase n nodes up nodeLimit
+	while (ownedNodes < nodeLimit) {
+		if (moneyAvailable() > hacknet.getPurchaseNodeCost()) {
+			hacknet.purchaseNode();
+			ownedNodes += 1;
+		} else {
+			sleep(3000);
+		}
+	}
+
+
+	// bump all levels to 10
+	for (var i = 0; i < ownedNodes; i++) {
+		while (hacknet.getNodeStats(i).level < 10) {
+			bumpLevel(i, 1);
+		}
+	}
+
+	inner:
+	while (true) {
+		for (var i = 0; i < ownedNodes; i++) {
+			levelCost = hacknet.getLevelUpgradeCost(i, 10);
+			ramCost = hacknet.getRamUpgradeCost(i);
+			coreCost = hacknet.getCoreUpgradeCost(i);
+			
+			if (levelCost == Infinity && ramCost == Infinity && coreCost == Infinity) {
+				maxedNodes += 1;
+				continue;
+			}
+
+			if (levelCost < ramCost) {
+				if (levelCost < coreCost) {
+					bumpLevel(i, 10);
+				} else {
+					bumpCore(i, 1);
+				}
+			} else {
+				if (ramCost < coreCost) {
+					bumpRam(i, 1);
+				} else {
+					bumpCore(i, 1);
+				}
+			}
+		}
+
+		if (maxedNodes == ownedNodes) {
+			print("all nodes maxed");
+			print("increasing node limit by 5");
+			nodeLimit += 5;
+			break inner;
+		} else {
+			maxedCount = 0;
+		}
+	}
+}
