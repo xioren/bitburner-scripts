@@ -54,7 +54,6 @@ while (true) {
 		}
 	}
 
-
 	// bump all levels to 10
 	for (var i = 0; i < ownedNodes; i++) {
 		while (hacknet.getNodeStats(i).level < 10) {
@@ -71,20 +70,19 @@ while (true) {
 			
 			if (levelCost == Infinity && ramCost == Infinity && coreCost == Infinity) {
 				maxedNodes += 1;
-				continue;
-			}
-
-			if (levelCost < ramCost) {
-				if (levelCost < coreCost) {
-					bumpLevel(i, 10);
-				} else {
-					bumpCore(i, 1);
-				}
 			} else {
-				if (ramCost < coreCost) {
-					bumpRam(i, 1);
+				if (levelCost < ramCost) {
+					if (levelCost < coreCost) {
+						bumpLevel(i, 10);
+					} else {
+						bumpCore(i, 1);
+					}
 				} else {
-					bumpCore(i, 1);
+					if (ramCost < coreCost) {
+						bumpRam(i, 1);
+					} else {
+						bumpCore(i, 1);
+					}
 				}
 			}
 		}
