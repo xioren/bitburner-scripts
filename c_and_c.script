@@ -1,11 +1,12 @@
 var visibleServers = [];
-var completedServers = ["home"];
-var currentServer = "";
-var ownedServers = ["home"].concat(getPurchasedServers());
-var whitelist = ["CSEC", "darkweb", "home"];
+var completedServers = [];
+var targetServer = "";
+var ownedServers = [];
+var whitelist = ["CSEC", "darkweb"];
 var files = ls("home", "/care_package/");
-var requiredRam = getScriptRam("/care_package/bootstrap.script");
+var requiredRam = getScriptRam("/care_package/bootstrap.script", "home");
 var serverSuccess = false;
+var portSmashingScripts = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe", "HTTPWorm.exe", "SQLInject.exe"];
 
 
 function Queue() {
@@ -13,7 +14,9 @@ function Queue() {
 }
 
 Queue.prototype.enqueue = function (e) {
-    if (completedServers.indexOf(e) == -1 && this.elements.indexOf(e) == -1) {
+    if (completedServers.indexOf(e) == -1 &&
+		ownedServers.indexOf(visibleServers[i]) == -1 &&
+		this.elements.indexOf(e) == -1) {
         this.elements.push(e);
     }
 };
@@ -33,23 +36,45 @@ Queue.prototype.length = function() {
 var queuedServers = new Queue();
 
 
+function updatOwnedServers() {
+	ownedServers = ["home"].concat(getPurchasedServers());
+}
+
+
+function portCount() {
+	// count how many ports can be opened
+	var maxPorts = 0;
+	for (var i = 0; i < portSmashingScripts.length; i++) {
+		if (fileExists(portSmashingScripts[i], "home")) {
+			maxPorts += 1;
+		}
+	}
+	return maxPorts;
+}
+
+
 function compromiseServer(hostname) {
 	var portsRequired = getServerNumPortsRequired(hostname);
 	var portsOpened = 0;
-	if (portsRequired > 0) {
-		if (portsRequired >= 5 && fileExists("SQLInject.exe", "home")) {
+
+	if (portsRequired > 0 && portCount() >= portsRequired) {
+		if (portsRequired >= 5) {
 			sqlinject(hostname);
 			portsOpened += 1;
-		} if (portsRequired >= 4 && fileExists("HTTPWorm.exe", "home")) {
+		}
+		if (portsRequired >= 4) {
 			httpworm(hostname);
 			portsOpened += 1;
-		} if (portsRequired >= 3 && fileExists("relaySMTP.exe", "home")) {
+		}
+		if (portsRequired >= 3) {
 			relaysmtp(hostname);
 			portsOpened += 1;
-		} if (portsRequired >= 2 && fileExists("FTPCrack.exe", "home")) {
+		}
+		if (portsRequired >= 2) {
 			ftpcrack(hostname);
 			portsOpened += 1;
-		} if (portsRequired >= 1 && fileExists("BruteSSH.exe", "home")) {
+		}
+		if (portsRequired >= 1) {
 			brutessh(hostname);
 			portsOpened += 1;
 		}
@@ -58,11 +83,14 @@ function compromiseServer(hostname) {
 			nuke(hostname);
 			return true;
 		} else {
+			print("cannot open enough ports on ", hostname);
 			return false;
 		}
-	} else {
+	} else if (portsRequired == 0) {
 		nuke(hostname);
 		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -72,8 +100,12 @@ function setupServer(hostname) {
 	var availableRam = getServerMaxRam(hostname) - getServerUsedRam(hostname);
 	
 	if (requiredRam < availableRam && whitelist.indexOf(hostname) == -1) {
-		scp(files, "home", hostname);	
-		killall(hostname);
+		if (fileExists("/care_package/bootstrap.script", hostname) == false) {
+			scp(files, "home", hostname);
+		}
+		if (scriptRunning("/care_package/mine.script", hostname) || scriptRunning("/care_package/fitness.script", hostname)) {
+			killall(hostname);
+		}
 		if (exec("/care_package/bootstrap.script", hostname, 1) == 0) {
 			return false;
 		} else {
@@ -87,27 +119,30 @@ function setupServer(hostname) {
 
 main:
 while (true) {
-    currentServer = queuedServers.dequeue();
-    visibleServers = scan(currentServer);
-    
+    targetServer = queuedServers.dequeue();
+	 // scan for and queue servers visibles to targetServer
+    visibleServers = scan(targetServer);
 	for (var i = 0; i < visibleServers.length; i++) {
         queuedServers.enqueue(visibleServers[i]);
     }
 
-	if (hasRootAccess(currentServer) == false) {
-		serverSuccess = compromiseServer(currentServer) == false &&
-						completedServers.indexOf(currentServer) == -1 &&
-						setupServer(currentServer);
+	updatOwnedServers();
+	if (hasRootAccess(targetServer) == false) {
+		serverSuccess = completedServers.indexOf(targetServer) == -1 &&
+					 	compromiseServer(targetServer) &&
+						setupServer(targetServer);
+	} else if (ownedServers.indexOf(targetServer) != -1) {
+		// skip server setup for owned servers
+		serverSuccess = true;
 	} else {
-		serverSuccess = ownedServers.indexOf(currentServer) == -1 &&
-						completedServers.indexOf(currentServer) == -1 &&
-						setupServer(currentServer);
+		serverSuccess = completedServers.indexOf(targetServer) == -1 &&
+						setupServer(targetServer);
 	}
 	
 	if (serverSuccess) {
-		completedServers.push(currentServer);
+		completedServers.push(targetServer);
 	} else {
-		queuedServers.enqueue(currentServer);
+		queuedServers.enqueue(targetServer);
 		continue;
 	}
     
